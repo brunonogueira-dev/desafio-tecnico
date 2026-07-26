@@ -32,6 +32,8 @@ builder.Services.AddSwaggerGen(options =>
     {
         options.IncludeXmlComments(xml);
     }
+
+    options.SchemaFilter<OnibusExpress.Api.Swagger.ExampleSchemaFilter>();
 });
 
 builder.Services.AddApplication();
@@ -55,7 +57,8 @@ app.UseSwagger();
 app.UseSwaggerUI(options =>
 {
     options.SwaggerEndpoint("/swagger/v1/swagger.json", "OniBus Express API v1");
-    options.RoutePrefix = "swagger";
+    // Swagger UI na raiz (http://localhost:8080/), conforme o plano.
+    options.RoutePrefix = string.Empty;
 });
 
 app.UseCors(CorsPolicy);

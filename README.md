@@ -35,7 +35,7 @@ cp .env.example .env
 docker compose up --build
 ```
 
-- API + Swagger: <http://localhost:8080/swagger>
+- API + Swagger: <http://localhost:8080/> (Swagger UI na raiz)
 - Frontend: <http://localhost:3000>
 - Health check: <http://localhost:8080/health>
 
@@ -114,7 +114,7 @@ A connection string **nunca** é gravada em `appsettings` versionado — vem de
 | GET | `/reservas/{codigo}` | Consulta reserva | 200 | 404 |
 | DELETE | `/reservas/{codigo}` | Cancela reserva | 204 | 404, 409 |
 
-Documentação interativa: **Swagger UI** em `/swagger`.
+Documentação interativa: **Swagger UI** na raiz (`/`), com exemplos de request/response.
 
 ---
 
