@@ -67,6 +67,22 @@ public sealed class FluxoCompletoTests(OnibusApiFactory factory) : IntegrationTe
         (await Ler(resposta)).GetArrayLength().Should().Be(0);
     }
 
+    // Viagem às 22h de São Paulo = 01h UTC do dia seguinte. A busca deve
+    // encontrá-la no dia LOCAL (10/01), não no dia UTC (11/01).
+    [Fact]
+    public async Task GetViagens_ViagemNoturna_DeveAparecerNoDiaLocalNaoNoDiaUtc()
+    {
+        // 2026-01-11T01:00Z == 2026-01-10 22:00 em America/Sao_Paulo.
+        await Factory.SeedViagemAsync(new DateTimeOffset(2026, 1, 11, 1, 0, 0, TimeSpan.Zero));
+        const string filtro = "origem=S%C3%A3o%20Paulo&destino=Rio%20de%20Janeiro";
+
+        var noDiaLocal = await Client.GetAsync($"/viagens?{filtro}&data=2026-01-10");
+        var noDiaUtc = await Client.GetAsync($"/viagens?{filtro}&data=2026-01-11");
+
+        (await Ler(noDiaLocal)).GetArrayLength().Should().Be(1, "a viagem pertence ao dia local 10/01");
+        (await Ler(noDiaUtc)).GetArrayLength().Should().Be(0, "não deve aparecer no dia 11/01");
+    }
+
     private static async Task<JsonElement> Ler(HttpResponseMessage resposta)
     {
         var texto = await resposta.Content.ReadAsStringAsync();

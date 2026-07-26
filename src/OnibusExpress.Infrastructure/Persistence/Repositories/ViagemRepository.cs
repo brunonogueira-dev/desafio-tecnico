@@ -7,11 +7,16 @@ namespace OnibusExpress.Infrastructure.Persistence.Repositories;
 
 public sealed class ViagemRepository(AppDbContext context) : IViagemRepository
 {
+    // A data da busca é um dia do calendário no fuso do usuário (Brasil), não em UTC.
+    // Assim uma viagem às 22h de SP não "vaza" para o dia seguinte na busca.
+    private static readonly TimeZoneInfo FusoBrasil =
+        TimeZoneInfo.FindSystemTimeZoneById("America/Sao_Paulo");
+
     public async Task<IReadOnlyList<ViagemComOcupacao>> BuscarAsync(
         string origem, string destino, DateOnly dataPartida, CancellationToken cancellationToken)
     {
-        var inicio = new DateTimeOffset(dataPartida.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
-        var fim = inicio.AddDays(1);
+        var inicio = InicioDoDiaLocalEmUtc(dataPartida);
+        var fim = InicioDoDiaLocalEmUtc(dataPartida.AddDays(1));
 
         // Projeção em um único round-trip: a contagem de ocupados é uma subquery
         // correlacionada, sem N+1 e sem carregar as reservas na memória.
@@ -47,4 +52,10 @@ public sealed class ViagemRepository(AppDbContext context) : IViagemRepository
             .Select(r => r.NumeroAssento)
             .OrderBy(n => n)
             .ToListAsync(cancellationToken);
+
+    private static DateTimeOffset InicioDoDiaLocalEmUtc(DateOnly dia)
+    {
+        var localMeiaNoite = dia.ToDateTime(TimeOnly.MinValue, DateTimeKind.Unspecified);
+        return new DateTimeOffset(TimeZoneInfo.ConvertTimeToUtc(localMeiaNoite, FusoBrasil), TimeSpan.Zero);
+    }
 }
