@@ -45,6 +45,18 @@ README do backend), que já orquestra banco, API e frontend.
 3. **Passageiro** — formulário validado (CPF com dígito verificador) e resumo.
 4. **Consulta** — busca por código, detalhes e cancelamento.
 
+### Capturas
+
+> Substitua os espaços abaixo pelas imagens em `docs/screenshots/` após rodar a aplicação.
+
+| Tela | Captura |
+|---|---|
+| 1 · Busca | `docs/screenshots/01-busca.png` |
+| 2 · Assentos | `docs/screenshots/02-assentos.png` |
+| 3 · Passageiro | `docs/screenshots/03-passageiro.png` |
+| 4 · Consulta | `docs/screenshots/04-consulta.png` |
+| Fluxo completo (gif) | `docs/screenshots/fluxo.gif` |
+
 ## Testes
 
 ```bash
