@@ -157,4 +157,3 @@ Os testes de integração usam **Testcontainers**, portanto exigem **Docker em e
 - Idempotência no `POST /reservas` (chave de idempotência).
 - Expiração de reserva pendente com fluxo de pagamento.
 - Observabilidade (OpenTelemetry) e CI (GitHub Actions).
-- Busca por data considerando fuso local do cliente (hoje a comparação é por dia UTC).
