@@ -68,12 +68,27 @@ public sealed class CriarReservaHandlerTests
     public async Task ExecutarAsync_DeveReaproveitarPassageiro_QuandoCpfJaExiste()
     {
         var c = Montar();
-        c.Db.Passageiros.Add(new Passageiro("Ana", Cpf.Criar(CpfValido), "ana@x.com", new DateOnly(1990, 5, 20)));
+        c.Db.Passageiros.Add(new Passageiro("Nome Antigo", Cpf.Criar(CpfValido), "antigo@x.com", new DateOnly(1990, 5, 20)));
 
         var resultado = await c.Handler.ExecutarAsync(Request(c.Viagem.Id), CancellationToken.None);
 
         resultado.IsSuccess.Should().BeTrue();
         c.Db.Passageiros.Should().ContainSingle("não deve duplicar passageiro com o mesmo CPF");
+        c.Db.Passageiros[0].Nome.Should().Be("Ana Souza", "reuso atualiza o nome informado");
+    }
+
+    [Fact]
+    public async Task ExecutarAsync_DeveFalharComValidacao_QuandoDataNascimentoNoFuturo()
+    {
+        var c = Montar();
+        var futura = new PassageiroInput("Ana", CpfValido, "ana@x.com", DateOnly.FromDateTime(Agora.UtcDateTime).AddDays(1));
+
+        var resultado = await c.Handler.ExecutarAsync(
+            new CriarReservaRequest(c.Viagem.Id, 5, futura), CancellationToken.None);
+
+        resultado.IsFailure.Should().BeTrue();
+        resultado.Error!.Code.Should().Be(ErrorCode.Validacao);
+        c.Db.Reservas.Should().BeEmpty();
     }
 
     [Fact]

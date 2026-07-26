@@ -34,6 +34,11 @@ public sealed class CriarReservaHandler(
             return Error.Validacao("email", "E-mail do passageiro é inválido.");
         }
 
+        if (request.Passageiro.DataNascimento >= DateOnly.FromDateTime(clock.UtcNow.UtcDateTime))
+        {
+            return Error.Validacao("dataNascimento", "A data de nascimento deve estar no passado.");
+        }
+
         var viagem = await viagens.ObterComRotaAsync(request.ViagemId, cancellationToken);
         if (viagem is null)
         {
@@ -63,6 +68,11 @@ public sealed class CriarReservaHandler(
             passageiro = new Passageiro(
                 request.Passageiro.Nome, cpf!, request.Passageiro.Email, request.Passageiro.DataNascimento);
             passageiros.Adicionar(passageiro);
+        }
+        else
+        {
+            // Mesmo CPF: mantém o cadastro, mas atualiza nome/e-mail se vieram diferentes.
+            passageiro.AtualizarDados(request.Passageiro.Nome, request.Passageiro.Email);
         }
 
         var codigo = await GerarCodigoUnicoAsync(cancellationToken);
