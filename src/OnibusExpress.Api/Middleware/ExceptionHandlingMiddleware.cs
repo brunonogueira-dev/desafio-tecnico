@@ -22,14 +22,17 @@ public sealed class ExceptionHandlingMiddleware(
         {
             await next(context);
         }
-        catch (DbUpdateException ex) when (EhViolacaoDeAssento(ex))
+        catch (DbUpdateException ex) when (ExtrairViolacaoUnica(ex) is { } pg)
         {
-            logger.LogWarning("Corrida de assento detectada pelo índice único parcial.");
+            var ehAssento = pg.ConstraintName == IndiceAssento;
+            logger.LogWarning("Violação de unicidade ({Constraint}) tratada como conflito.", pg.ConstraintName);
             await EscreverProblema(
                 context,
                 StatusCodes.Status409Conflict,
-                "Assento indisponível",
-                "O assento acabou de ser reservado por outra pessoa. Escolha outro assento.");
+                ehAssento ? "Assento indisponível" : "Conflito de dados",
+                ehAssento
+                    ? "O assento acabou de ser reservado por outra pessoa. Escolha outro assento."
+                    : "Não foi possível concluir a reserva por um conflito simultâneo. Tente novamente.");
         }
         catch (DomainException ex)
         {
@@ -52,10 +55,8 @@ public sealed class ExceptionHandlingMiddleware(
         }
     }
 
-    private static bool EhViolacaoDeAssento(DbUpdateException ex) =>
-        ex.InnerException is PostgresException pg
-        && pg.SqlState == PostgresErrorCodes.UniqueViolation
-        && pg.ConstraintName == IndiceAssento;
+    private static PostgresException? ExtrairViolacaoUnica(DbUpdateException ex) =>
+        ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation } pg ? pg : null;
 
     private static async Task EscreverProblema(
         HttpContext context, int status, string title, string detail)

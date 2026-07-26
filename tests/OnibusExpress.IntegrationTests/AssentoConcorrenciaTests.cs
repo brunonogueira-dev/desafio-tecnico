@@ -34,4 +34,24 @@ public sealed class AssentoConcorrenciaTests(OnibusApiFactory factory) : Integra
         respostas.Count(r => r.StatusCode == HttpStatusCode.Created).Should().Be(1);
         respostas.Count(r => r.StatusCode == HttpStatusCode.Conflict).Should().Be(9);
     }
+
+    // Edge: mesmo CPF novo reservando assentos DIFERENTES em paralelo. A corrida
+    // no índice único de Passageiro.Cpf não pode virar 500 — vira 409 (retryável).
+    [Fact]
+    public async Task PostReservas_MesmoCpfNovoEmParalelo_NuncaRetorna500()
+    {
+        var viagemId = await Factory.SeedViagemAsync(Factory.Clock.UtcNow.AddDays(5));
+        var cpf = CpfGen.Valido(42);
+
+        var tarefas = Enumerable.Range(1, 5)
+            .Select(assento => PostReservaAsync(viagemId, assento, cpf))
+            .ToArray();
+
+        var respostas = await Task.WhenAll(tarefas);
+
+        respostas.Should().NotContain(r => r.StatusCode == HttpStatusCode.InternalServerError);
+        respostas.Count(r => r.StatusCode == HttpStatusCode.Created).Should().BeGreaterThanOrEqualTo(1);
+        respostas.Should().OnlyContain(r =>
+            r.StatusCode == HttpStatusCode.Created || r.StatusCode == HttpStatusCode.Conflict);
+    }
 }
