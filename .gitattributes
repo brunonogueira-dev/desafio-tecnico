@@ -1,0 +1,25 @@
+# Normaliza fim de linha: LF no repositório para todo texto.
+# Evita quebra de scripts que rodam em containers Linux.
+* text=auto eol=lf
+
+*.sh    text eol=lf
+*.cs    text eol=lf
+*.csproj text eol=lf
+*.props text eol=lf
+*.yml   text eol=lf
+*.yaml  text eol=lf
+*.json  text eol=lf
+*.ts    text eol=lf
+*.tsx   text eol=lf
+Dockerfile text eol=lf
+
+*.sln   text eol=crlf
+
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.woff  binary
+*.woff2 binary
+*.pdf  binary

@@ -38,6 +38,8 @@ ScaffoldingReadMe.txt
 
 # dotenv environment variables file
 .env
+*.env
+!.env.example
 
 # Others
 ~$*
@@ -55,3 +57,30 @@ CodeCoverage/
 *.VisualState.xml
 TestResult.xml
 nunit-*.xml
+
+# ---------- Node / Frontend ----------
+node_modules/
+dist/
+dist-ssr/
+.vite/
+*.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ---------- IDE / Editor ----------
+.vs/
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp
+*.DS_Store
+Thumbs.db
+
+# ---------- Material de preparação (não versionar) ----------
+COLA-1PAGINA.md
+GUIA-ENTREVISTA.md
+GUIA-ENTREVISTA.html
+GUIA-ENTREVISTA.pdf
+plan.md
