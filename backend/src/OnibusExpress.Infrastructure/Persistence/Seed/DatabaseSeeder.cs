@@ -6,31 +6,129 @@ using OnibusExpress.Domain.ValueObjects;
 namespace OnibusExpress.Infrastructure.Persistence.Seed;
 
 /// <summary>
-/// Popula o banco com rotas, viagens futuras (datas relativas ao "agora") e
-/// algumas reservas pré-existentes. Idempotente: não faz nada se já houver dados.
+/// Popula o banco para o ambiente de teste. As rotas e as reservas de exemplo
+/// são criadas uma única vez; as VIAGENS são garantidas a cada subida para os
+/// próximos <see cref="DiasAFrente"/> dias, em vários horários — assim a busca
+/// sempre tem dados atuais, sem duplicar (idempotente por rota + horário).
 /// </summary>
 public static class DatabaseSeeder
 {
+    private const int DiasAFrente = 7;
+    private const int TotalAssentos = 42;
+
+    // Horários de partida em horário LOCAL (Brasil); convertidos para UTC ao gravar.
+    private static readonly int[] HorariosLocais = [6, 9, 12, 15, 18, 21];
+
+    private static readonly decimal[] PrecosBasePorRota =
+        [89.90m, 120.00m, 95.50m, 149.90m, 79.00m, 135.00m];
+
+    private static readonly TimeZoneInfo FusoBrasil =
+        TimeZoneInfo.FindSystemTimeZoneById("America/Sao_Paulo");
+
     public static async Task SeedAsync(
         AppDbContext context, IDateTimeProvider clock, CancellationToken cancellationToken = default)
+    {
+        await GarantirRotasAsync(context, cancellationToken);
+
+        var rotas = await context.Rotas.AsNoTracking().ToListAsync(cancellationToken);
+        await GarantirViagensDosProximosDiasAsync(context, rotas, clock, cancellationToken);
+        await GarantirReservasIniciaisAsync(context, clock, cancellationToken);
+    }
+
+    private static async Task GarantirRotasAsync(AppDbContext context, CancellationToken cancellationToken)
     {
         if (await context.Rotas.AnyAsync(cancellationToken))
         {
             return;
         }
 
-        var rotas = CriarRotas();
-        context.Rotas.AddRange(rotas);
+        context.Rotas.AddRange(CriarRotas());
+        await context.SaveChangesAsync(cancellationToken);
+    }
 
-        var viagens = CriarViagens(rotas, clock).ToList();
-        context.Viagens.AddRange(viagens);
+    private static async Task GarantirViagensDosProximosDiasAsync(
+        AppDbContext context, IReadOnlyList<Rota> rotas, IDateTimeProvider clock, CancellationToken cancellationToken)
+    {
+        // Chaves já existentes (rota + instante), para não duplicar em subidas repetidas.
+        var existentes = await context.Viagens
+            .AsNoTracking()
+            .Select(v => new { v.RotaId, v.DataHoraPartida })
+            .ToListAsync(cancellationToken);
+
+        var chaves = existentes
+            .Select(x => (x.RotaId, x.DataHoraPartida))
+            .ToHashSet();
+
+        var hoje = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(clock.UtcNow, FusoBrasil).DateTime);
+        var novas = new List<Viagem>();
+
+        for (var dia = 0; dia < DiasAFrente; dia++)
+        {
+            var data = hoje.AddDays(dia);
+
+            for (var i = 0; i < rotas.Count; i++)
+            {
+                var rota = rotas[i];
+
+                for (var h = 0; h < HorariosLocais.Length; h++)
+                {
+                    var partida = PartidaUtc(data, HorariosLocais[h]);
+                    if (chaves.Contains((rota.Id, partida)))
+                    {
+                        continue;
+                    }
+
+                    var preco = PrecosBasePorRota[i % PrecosBasePorRota.Length] + h * 5m;
+                    novas.Add(new Viagem(rota.Id, partida, preco, TotalAssentos));
+                }
+            }
+        }
+
+        if (novas.Count > 0)
+        {
+            context.Viagens.AddRange(novas);
+            await context.SaveChangesAsync(cancellationToken);
+        }
+    }
+
+    private static async Task GarantirReservasIniciaisAsync(
+        AppDbContext context, IDateTimeProvider clock, CancellationToken cancellationToken)
+    {
+        if (await context.Reservas.AnyAsync(cancellationToken))
+        {
+            return;
+        }
+
+        // Ocupa alguns assentos da próxima viagem futura, para o mapa não nascer vazio.
+        var agora = clock.UtcNow;
+        var viagem = await context.Viagens
+            .AsNoTracking()
+            .Where(v => v.DataHoraPartida > agora)
+            .OrderBy(v => v.DataHoraPartida)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (viagem is null)
+        {
+            return;
+        }
 
         var passageiros = CriarPassageiros();
         context.Passageiros.AddRange(passageiros);
 
-        context.Reservas.AddRange(CriarReservasIniciais(viagens[0], passageiros));
+        context.Reservas.AddRange(
+            new Reserva(viagem.Id, passageiros[0].Id, 1, CodigoReserva.Gerar()),
+            new Reserva(viagem.Id, passageiros[0].Id, 2, CodigoReserva.Gerar()),
+            new Reserva(viagem.Id, passageiros[1].Id, 5, CodigoReserva.Gerar()),
+            new Reserva(viagem.Id, passageiros[1].Id, 12, CodigoReserva.Gerar()));
 
         await context.SaveChangesAsync(cancellationToken);
+    }
+
+    private static DateTimeOffset PartidaUtc(DateOnly dia, int horaLocal)
+    {
+        var local = dia.ToDateTime(new TimeOnly(horaLocal, 0), DateTimeKind.Unspecified);
+        var utc = TimeZoneInfo.ConvertTimeToUtc(local, FusoBrasil);
+        return new DateTimeOffset(utc, TimeSpan.Zero);
     }
 
     private static List<Rota> CriarRotas() =>
@@ -43,40 +141,9 @@ public static class DatabaseSeeder
         new("Belo Horizonte", "Rio de Janeiro", TimeSpan.FromHours(7)),
     ];
 
-    private static IEnumerable<Viagem> CriarViagens(IReadOnlyList<Rota> rotas, IDateTimeProvider clock)
-    {
-        var baseDia = clock.UtcNow.UtcDateTime.Date;
-        var horarios = new[] { 8, 14, 22 };
-        var diasOffset = new[] { 1, 3, 6, 10 };
-        var precosBase = new[] { 89.90m, 120.00m, 95.50m, 149.90m, 79.00m, 135.00m };
-
-        for (var i = 0; i < rotas.Count; i++)
-        {
-            var rota = rotas[i];
-            // Alterna dias/horários por rota para variar sem gerar viagens demais.
-            for (var j = 0; j < diasOffset.Length; j++)
-            {
-                var dia = baseDia.AddDays(diasOffset[j]);
-                var hora = horarios[(i + j) % horarios.Length];
-                var partida = new DateTimeOffset(dia.AddHours(hora), TimeSpan.Zero);
-                var preco = precosBase[i] + j * 10m;
-                yield return new Viagem(rota.Id, partida, preco, totalAssentos: 42);
-            }
-        }
-    }
-
     private static List<Passageiro> CriarPassageiros() =>
     [
         new("Mariana Oliveira", Cpf.Criar("52998224725"), "mariana.oliveira@exemplo.com", new DateOnly(1992, 3, 14)),
         new("Carlos Andrade", Cpf.Criar("16899535009"), "carlos.andrade@exemplo.com", new DateOnly(1987, 11, 2)),
     ];
-
-    private static IEnumerable<Reserva> CriarReservasIniciais(Viagem viagem, IReadOnlyList<Passageiro> passageiros)
-    {
-        // Ocupa alguns assentos para o mapa não nascer vazio.
-        yield return new Reserva(viagem.Id, passageiros[0].Id, 1, CodigoReserva.Gerar());
-        yield return new Reserva(viagem.Id, passageiros[0].Id, 2, CodigoReserva.Gerar());
-        yield return new Reserva(viagem.Id, passageiros[1].Id, 5, CodigoReserva.Gerar());
-        yield return new Reserva(viagem.Id, passageiros[1].Id, 12, CodigoReserva.Gerar());
-    }
 }
