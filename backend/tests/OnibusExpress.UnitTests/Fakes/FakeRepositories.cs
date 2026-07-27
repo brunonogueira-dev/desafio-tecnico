@@ -13,23 +13,36 @@ public sealed class FakeRotaRepository(FakeDatabase db) : IRotaRepository
 
 public sealed class FakeViagemRepository(FakeDatabase db) : IViagemRepository
 {
-    public Task<IReadOnlyList<ViagemComOcupacao>> BuscarAsync(
-        string origem, string destino, DateOnly dataPartida, CancellationToken cancellationToken)
+    public Task<PaginaDeViagens> BuscarAsync(
+        string? origem, string? destino, DateOnly dataPartida, int pagina, int tamanho,
+        CancellationToken cancellationToken)
     {
-        var resultado = db.Viagens
+        var filtrado = db.Viagens
             .Select(v => new { Viagem = v, Rota = db.Rotas.First(r => r.Id == v.RotaId) })
-            .Where(x =>
-                string.Equals(x.Rota.Origem, origem, StringComparison.OrdinalIgnoreCase) &&
-                string.Equals(x.Rota.Destino, destino, StringComparison.OrdinalIgnoreCase) &&
-                DateOnly.FromDateTime(x.Viagem.DataHoraPartida.UtcDateTime) == dataPartida)
-            .OrderBy(x => x.Viagem.DataHoraPartida)
+            .Where(x => DateOnly.FromDateTime(x.Viagem.DataHoraPartida.UtcDateTime) == dataPartida);
+
+        if (!string.IsNullOrWhiteSpace(origem))
+        {
+            filtrado = filtrado.Where(x => string.Equals(x.Rota.Origem, origem, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (!string.IsNullOrWhiteSpace(destino))
+        {
+            filtrado = filtrado.Where(x => string.Equals(x.Rota.Destino, destino, StringComparison.OrdinalIgnoreCase));
+        }
+
+        var ordenado = filtrado.OrderBy(x => x.Viagem.DataHoraPartida).ToList();
+
+        var itens = ordenado
+            .Skip((pagina - 1) * tamanho)
+            .Take(tamanho)
             .Select(x => new ViagemComOcupacao(
                 x.Viagem.Id, x.Rota.Origem, x.Rota.Destino, x.Viagem.DataHoraPartida,
                 x.Rota.DuracaoEstimada, x.Viagem.PrecoBase, x.Viagem.TotalAssentos,
                 db.Reservas.Count(res => res.ViagemId == x.Viagem.Id && res.Status == StatusReserva.Confirmada)))
             .ToList();
 
-        return Task.FromResult<IReadOnlyList<ViagemComOcupacao>>(resultado);
+        return Task.FromResult(new PaginaDeViagens(itens, ordenado.Count));
     }
 
     public Task<Viagem?> ObterComRotaAsync(Guid id, CancellationToken cancellationToken)

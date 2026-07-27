@@ -16,7 +16,7 @@ public sealed class FluxoCompletoTests(OnibusApiFactory factory) : IntegrationTe
         // Buscar
         var busca = await Client.GetAsync("/viagens?origem=S%C3%A3o%20Paulo&destino=Rio%20de%20Janeiro&data=2026-01-10");
         busca.StatusCode.Should().Be(HttpStatusCode.OK);
-        (await Ler(busca)).GetArrayLength().Should().Be(1);
+        (await Ler(busca)).GetProperty("itens").GetArrayLength().Should().Be(1);
 
         // Detalhar
         var detalhe = await Client.GetAsync($"/viagens/{viagemId}");
@@ -59,12 +59,26 @@ public sealed class FluxoCompletoTests(OnibusApiFactory factory) : IntegrationTe
     }
 
     [Fact]
-    public async Task GetViagens_SemResultado_DeveRetornar200ComListaVazia()
+    public async Task GetViagens_SemResultado_DeveRetornar200ComPaginaVazia()
     {
         var resposta = await Client.GetAsync("/viagens?origem=Curitiba&destino=Florian%C3%B3polis&data=2026-01-10");
 
         resposta.StatusCode.Should().Be(HttpStatusCode.OK);
-        (await Ler(resposta)).GetArrayLength().Should().Be(0);
+        var corpo = await Ler(resposta);
+        corpo.GetProperty("itens").GetArrayLength().Should().Be(0);
+        corpo.GetProperty("total").GetInt32().Should().Be(0);
+    }
+
+    [Fact]
+    public async Task GetViagens_SemOrigemEDestino_DeveListarAsViagensDoDia()
+    {
+        var partida = new DateTimeOffset(2026, 1, 10, 12, 0, 0, TimeSpan.Zero);
+        await Factory.SeedViagemAsync(partida);
+
+        var resposta = await Client.GetAsync("/viagens?data=2026-01-10");
+
+        resposta.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await Ler(resposta)).GetProperty("itens").GetArrayLength().Should().BeGreaterThan(0);
     }
 
     // Viagem às 22h de São Paulo = 01h UTC do dia seguinte. A busca deve
@@ -79,8 +93,8 @@ public sealed class FluxoCompletoTests(OnibusApiFactory factory) : IntegrationTe
         var noDiaLocal = await Client.GetAsync($"/viagens?{filtro}&data=2026-01-10");
         var noDiaUtc = await Client.GetAsync($"/viagens?{filtro}&data=2026-01-11");
 
-        (await Ler(noDiaLocal)).GetArrayLength().Should().Be(1, "a viagem pertence ao dia local 10/01");
-        (await Ler(noDiaUtc)).GetArrayLength().Should().Be(0, "não deve aparecer no dia 11/01");
+        (await Ler(noDiaLocal)).GetProperty("itens").GetArrayLength().Should().Be(1, "a viagem pertence ao dia local 10/01");
+        (await Ler(noDiaUtc)).GetProperty("itens").GetArrayLength().Should().Be(0, "não deve aparecer no dia 11/01");
     }
 
     private static async Task<JsonElement> Ler(HttpResponseMessage resposta)

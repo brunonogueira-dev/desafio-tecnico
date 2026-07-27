@@ -81,7 +81,7 @@ O Domain não referencia nada externo.
 | Método | Rota | Descrição |
 |--------|------|-----------|
 | GET | `/rotas` | Lista rotas |
-| GET | `/viagens?origem=&destino=&data=` | Busca viagens com vagas |
+| GET | `/viagens?origem=&destino=&data=&pagina=&tamanho=` | Lista viagens do dia, paginadas (10/pág.); `origem`/`destino` opcionais, `data` padrão hoje |
 | GET | `/viagens/{id}` | Detalhe + mapa de assentos |
 | POST | `/reservas` | Cria reserva (201 + Location) |
 | GET | `/reservas/{codigo}` | Consulta reserva |

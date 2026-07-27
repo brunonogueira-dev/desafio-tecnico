@@ -3,16 +3,16 @@ using OnibusExpress.Application.Common;
 
 namespace OnibusExpress.Application.Features.Viagens;
 
-/// <summary>Busca viagens por origem, destino e data (GET /viagens).</summary>
+/// <summary>Busca paginada de viagens de um dia, com origem/destino opcionais (GET /viagens).</summary>
 public sealed class BuscarViagensHandler(IViagemRepository viagens)
 {
-    public async Task<Result<IReadOnlyList<ViagemResumoDto>>> ExecutarAsync(
+    public async Task<Result<ViagensPaginadasDto>> ExecutarAsync(
         BuscarViagensRequest request, CancellationToken cancellationToken)
     {
-        var encontradas = await viagens.BuscarAsync(
-            request.Origem, request.Destino, request.Data, cancellationToken);
+        var pagina = await viagens.BuscarAsync(
+            request.Origem, request.Destino, request.Data, request.Pagina, request.Tamanho, cancellationToken);
 
-        var dtos = encontradas
+        var itens = pagina.Itens
             .Select(v => new ViagemResumoDto(
                 v.Id,
                 v.Origem,
@@ -24,6 +24,11 @@ public sealed class BuscarViagensHandler(IViagemRepository viagens)
                 v.TotalAssentos - v.AssentosOcupados))
             .ToList();
 
-        return Result.Success<IReadOnlyList<ViagemResumoDto>>(dtos);
+        var totalPaginas = pagina.Total == 0
+            ? 0
+            : (int)Math.Ceiling(pagina.Total / (double)request.Tamanho);
+
+        var dto = new ViagensPaginadasDto(itens, request.Pagina, request.Tamanho, pagina.Total, totalPaginas);
+        return Result.Success(dto);
     }
 }

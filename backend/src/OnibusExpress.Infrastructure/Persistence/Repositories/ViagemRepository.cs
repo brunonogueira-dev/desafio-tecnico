@@ -12,21 +12,36 @@ public sealed class ViagemRepository(AppDbContext context) : IViagemRepository
     private static readonly TimeZoneInfo FusoBrasil =
         TimeZoneInfo.FindSystemTimeZoneById("America/Sao_Paulo");
 
-    public async Task<IReadOnlyList<ViagemComOcupacao>> BuscarAsync(
-        string origem, string destino, DateOnly dataPartida, CancellationToken cancellationToken)
+    public async Task<PaginaDeViagens> BuscarAsync(
+        string? origem, string? destino, DateOnly dataPartida, int pagina, int tamanho,
+        CancellationToken cancellationToken)
     {
         var inicio = InicioDoDiaLocalEmUtc(dataPartida);
         var fim = InicioDoDiaLocalEmUtc(dataPartida.AddDays(1));
 
+        var query = context.Viagens
+            .AsNoTracking()
+            .Where(v => v.DataHoraPartida >= inicio && v.DataHoraPartida < fim);
+
+        // Origem/destino são filtros opcionais (permite listar todas as viagens do dia).
+        if (!string.IsNullOrWhiteSpace(origem))
+        {
+            query = query.Where(v => v.Rota!.Origem == origem);
+        }
+
+        if (!string.IsNullOrWhiteSpace(destino))
+        {
+            query = query.Where(v => v.Rota!.Destino == destino);
+        }
+
+        var total = await query.CountAsync(cancellationToken);
+
         // Projeção em um único round-trip: a contagem de ocupados é uma subquery
         // correlacionada, sem N+1 e sem carregar as reservas na memória.
-        return await context.Viagens
-            .AsNoTracking()
-            .Where(v => v.Rota!.Origem == origem
-                     && v.Rota.Destino == destino
-                     && v.DataHoraPartida >= inicio
-                     && v.DataHoraPartida < fim)
+        var itens = await query
             .OrderBy(v => v.DataHoraPartida)
+            .Skip((pagina - 1) * tamanho)
+            .Take(tamanho)
             .Select(v => new ViagemComOcupacao(
                 v.Id,
                 v.Rota!.Origem,
@@ -37,6 +52,8 @@ public sealed class ViagemRepository(AppDbContext context) : IViagemRepository
                 v.TotalAssentos,
                 context.Reservas.Count(r => r.ViagemId == v.Id && r.Status == StatusReserva.Confirmada)))
             .ToListAsync(cancellationToken);
+
+        return new PaginaDeViagens(itens, total);
     }
 
     public async Task<Viagem?> ObterComRotaAsync(Guid id, CancellationToken cancellationToken) =>

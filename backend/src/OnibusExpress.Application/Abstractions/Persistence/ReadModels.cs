@@ -13,3 +13,6 @@ public sealed record ViagemComOcupacao(
     decimal PrecoBase,
     int TotalAssentos,
     int AssentosOcupados);
+
+/// <summary>Uma página de viagens mais o total de itens que casam com o filtro.</summary>
+public sealed record PaginaDeViagens(IReadOnlyList<ViagemComOcupacao> Itens, int Total);

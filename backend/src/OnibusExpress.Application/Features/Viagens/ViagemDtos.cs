@@ -1,7 +1,8 @@
 namespace OnibusExpress.Application.Features.Viagens;
 
-/// <summary>Filtros obrigatórios da busca de viagens.</summary>
-public sealed record BuscarViagensRequest(string Origem, string Destino, DateOnly Data);
+/// <summary>Filtros da busca. Origem/destino são opcionais; data e paginação sempre definidas.</summary>
+public sealed record BuscarViagensRequest(
+    string? Origem, string? Destino, DateOnly Data, int Pagina, int Tamanho);
 
 /// <summary>Viagem na listagem de busca, com vagas derivadas.</summary>
 public sealed record ViagemResumoDto(
@@ -13,6 +14,14 @@ public sealed record ViagemResumoDto(
     decimal PrecoBase,
     int TotalAssentos,
     int VagasDisponiveis);
+
+/// <summary>Página de resultados da busca de viagens.</summary>
+public sealed record ViagensPaginadasDto(
+    IReadOnlyList<ViagemResumoDto> Itens,
+    int Pagina,
+    int Tamanho,
+    int Total,
+    int TotalPaginas);
 
 /// <summary>Assento no mapa de assentos.</summary>
 public sealed record AssentoDto(int Numero, bool Ocupado);
