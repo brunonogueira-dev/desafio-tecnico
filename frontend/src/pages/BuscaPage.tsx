@@ -6,18 +6,21 @@ import { ErrorState, EmptyState, ViagensSkeleton } from '@/components/States';
 import { formatarBRL, formatarData, formatarHora, formatarDuracao } from '@/lib/format';
 import type { ViagemResumo } from '@/services/types';
 
-interface Filtros {
+interface Criterio {
   origem: string;
   destino: string;
   data: string;
+  pagina: number;
 }
 
 export function BuscaPage() {
   const navigate = useNavigate();
   const selecionarViagem = useCompra((s) => s.selecionarViagem);
   const rotasQuery = useRotas();
-  const [form, setForm] = useState<Filtros>({ origem: '', destino: '', data: '' });
-  const [busca, setBusca] = useState<Filtros | null>(null);
+
+  const hoje = new Date().toISOString().slice(0, 10);
+  const [form, setForm] = useState({ origem: '', destino: '', data: hoje });
+  const [criterio, setCriterio] = useState<Criterio>({ origem: '', destino: '', data: hoje, pagina: 1 });
 
   const origens = useMemo(
     () => [...new Set((rotasQuery.data ?? []).map((r) => r.origem))].sort(),
@@ -29,31 +32,33 @@ export function BuscaPage() {
     [rotasQuery.data, form.origem],
   );
 
-  const viagensQuery = useViagens(
-    busca?.origem ?? '',
-    busca?.destino ?? '',
-    busca?.data ?? '',
-    busca !== null,
-  );
+  const viagensQuery = useViagens({
+    origem: criterio.origem || undefined,
+    destino: criterio.destino || undefined,
+    data: criterio.data,
+    pagina: criterio.pagina,
+  });
 
   const submeter = (e: FormEvent) => {
     e.preventDefault();
-    if (form.origem && form.destino && form.data) {
-      setBusca({ ...form });
-    }
+    setCriterio({ origem: form.origem, destino: form.destino, data: form.data || hoje, pagina: 1 });
   };
+
+  const irParaPagina = (pagina: number) => setCriterio((c) => ({ ...c, pagina }));
 
   const escolher = (viagem: ViagemResumo) => {
     selecionarViagem(viagem);
     navigate(`/viagens/${viagem.id}/assentos`);
   };
 
-  const hoje = new Date().toISOString().slice(0, 10);
+  const pagina = viagensQuery.data;
 
   return (
     <section className="page">
       <h1>Para onde você vai?</h1>
-      <p className="subtitle">Escolha origem, destino e data para ver as viagens disponíveis.</p>
+      <p className="subtitle">
+        Estas são as viagens de {formatarData(criterio.data)}. Filtre por origem e destino se quiser.
+      </p>
 
       <form className="card busca-form" onSubmit={submeter}>
         <div className="field">
@@ -62,9 +67,8 @@ export function BuscaPage() {
             id="origem"
             value={form.origem}
             onChange={(e) => setForm({ ...form, origem: e.target.value, destino: '' })}
-            required
           >
-            <option value="">Selecione</option>
+            <option value="">Todas</option>
             {origens.map((o) => (
               <option key={o} value={o}>{o}</option>
             ))}
@@ -78,9 +82,8 @@ export function BuscaPage() {
             value={form.destino}
             onChange={(e) => setForm({ ...form, destino: e.target.value })}
             disabled={!form.origem}
-            required
           >
-            <option value="">Selecione</option>
+            <option value="">Todos</option>
             {destinos.map((d) => (
               <option key={d} value={d}>{d}</option>
             ))}
@@ -95,7 +98,6 @@ export function BuscaPage() {
             min={hoje}
             value={form.data}
             onChange={(e) => setForm({ ...form, data: e.target.value })}
-            required
           />
         </div>
 
@@ -106,21 +108,25 @@ export function BuscaPage() {
         <ErrorState mensagem="Não foi possível carregar as rotas." onRetry={() => rotasQuery.refetch()} />
       )}
 
-      {busca && (
-        <div className="resultados">
-          {viagensQuery.isLoading && <ViagensSkeleton />}
-          {viagensQuery.isError && (
-            <ErrorState
-              mensagem="Não foi possível buscar as viagens. Tente novamente."
-              onRetry={() => viagensQuery.refetch()}
-            />
-          )}
-          {viagensQuery.isSuccess && viagensQuery.data.length === 0 && (
-            <EmptyState mensagem="Nenhuma viagem encontrada para esta data." />
-          )}
-          {viagensQuery.isSuccess && viagensQuery.data.length > 0 && (
+      <div className="resultados">
+        {viagensQuery.isLoading && <ViagensSkeleton />}
+
+        {viagensQuery.isError && (
+          <ErrorState
+            mensagem="Não foi possível buscar as viagens. Tente novamente."
+            onRetry={() => viagensQuery.refetch()}
+          />
+        )}
+
+        {pagina && pagina.itens.length === 0 && (
+          <EmptyState mensagem="Nenhuma viagem encontrada para esta data." />
+        )}
+
+        {pagina && pagina.itens.length > 0 && (
+          <>
+            <p className="resultados-total">{pagina.total} viagem(ns) encontrada(s)</p>
             <ul className="viagem-list">
-              {viagensQuery.data.map((v) => (
+              {pagina.itens.map((v) => (
                 <li key={v.id}>
                   <article className="card viagem-card">
                     <div className="viagem-rota">
@@ -148,9 +154,31 @@ export function BuscaPage() {
                 </li>
               ))}
             </ul>
-          )}
-        </div>
-      )}
+
+            {pagina.totalPaginas > 1 && (
+              <nav className="paginacao" aria-label="Paginação">
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() => irParaPagina(criterio.pagina - 1)}
+                  disabled={criterio.pagina <= 1}
+                >
+                  Anterior
+                </button>
+                <span aria-live="polite">Página {pagina.pagina} de {pagina.totalPaginas}</span>
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() => irParaPagina(criterio.pagina + 1)}
+                  disabled={criterio.pagina >= pagina.totalPaginas}
+                >
+                  Próxima
+                </button>
+              </nav>
+            )}
+          </>
+        )}
+      </div>
     </section>
   );
 }

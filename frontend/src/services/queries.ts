@@ -1,6 +1,6 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from './api';
-import type { CriarReservaInput } from './types';
+import type { BuscaViagensParams, CriarReservaInput } from './types';
 
 export function useRotas() {
   return useQuery({
@@ -10,11 +10,12 @@ export function useRotas() {
   });
 }
 
-export function useViagens(origem: string, destino: string, data: string, habilitado: boolean) {
+export function useViagens(params: BuscaViagensParams) {
   return useQuery({
-    queryKey: ['viagens', origem, destino, data],
-    queryFn: () => api.buscarViagens(origem, destino, data),
-    enabled: habilitado,
+    queryKey: ['viagens', params.origem ?? '', params.destino ?? '', params.data, params.pagina ?? 1],
+    queryFn: () => api.buscarViagens(params),
+    enabled: Boolean(params.data),
+    placeholderData: keepPreviousData,
   });
 }
 

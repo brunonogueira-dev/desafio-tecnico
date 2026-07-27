@@ -1,11 +1,12 @@
 import { API_BASE_URL } from './config';
 import type {
   ApiError,
+  BuscaViagensParams,
   CriarReservaInput,
   Reserva,
   Rota,
   ViagemDetalhe,
-  ViagemResumo,
+  ViagensPaginadas,
 } from './types';
 
 /** Mensagem amigável em português, orientada à ação, a partir de um ApiError. */
@@ -63,10 +64,15 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 export const api = {
   listarRotas: () => request<Rota[]>('/rotas'),
 
-  buscarViagens: (origem: string, destino: string, data: string) =>
-    request<ViagemResumo[]>(
-      `/viagens?origem=${encodeURIComponent(origem)}&destino=${encodeURIComponent(destino)}&data=${data}`,
-    ),
+  buscarViagens: (params: BuscaViagensParams) => {
+    const query = new URLSearchParams();
+    if (params.origem) query.set('origem', params.origem);
+    if (params.destino) query.set('destino', params.destino);
+    query.set('data', params.data);
+    query.set('pagina', String(params.pagina ?? 1));
+    query.set('tamanho', String(params.tamanho ?? 10));
+    return request<ViagensPaginadas>(`/viagens?${query.toString()}`);
+  },
 
   obterViagem: (id: string) => request<ViagemDetalhe>(`/viagens/${id}`),
 

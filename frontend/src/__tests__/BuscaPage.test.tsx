@@ -26,7 +26,11 @@ describe('BuscaPage', () => {
   });
 
   it('mostra mensagem quando não há viagens', async () => {
-    server.use(http.get(`${API}/viagens`, () => HttpResponse.json([])));
+    server.use(
+      http.get(`${API}/viagens`, () =>
+        HttpResponse.json({ itens: [], pagina: 1, tamanho: 10, total: 0, totalPaginas: 0 }),
+      ),
+    );
     renderApp(['/']);
     await preencherBusca();
 

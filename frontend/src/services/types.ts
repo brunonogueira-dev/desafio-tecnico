@@ -18,6 +18,24 @@ export interface ViagemResumo {
   vagasDisponiveis: number;
 }
 
+/** Página de resultados da busca de viagens (GET /viagens). */
+export interface ViagensPaginadas {
+  itens: ViagemResumo[];
+  pagina: number;
+  tamanho: number;
+  total: number;
+  totalPaginas: number;
+}
+
+/** Filtros da busca; origem/destino são opcionais. */
+export interface BuscaViagensParams {
+  origem?: string;
+  destino?: string;
+  data: string;
+  pagina?: number;
+  tamanho?: number;
+}
+
 export interface Assento {
   numero: number;
   ocupado: boolean;
