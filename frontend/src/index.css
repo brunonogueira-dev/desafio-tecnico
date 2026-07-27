@@ -137,9 +137,9 @@ h2 { font-size: 1.1rem; margin: 0 0 0.75rem; }
 .seat-sample.selecionado { background: var(--accent); }
 .seat-sample.ocupado { background: #d7dde1; }
 .seatmap-cabin { max-width: 320px; margin: 0 auto; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 1.25rem; display: flex; flex-direction: column; gap: 0.6rem; }
-.seat-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; }
+.seat-row { display: grid; grid-template-columns: 1fr 1fr 1.25rem 1fr 1fr; gap: 0.5rem; }
 .seat { aspect-ratio: 1; border-radius: 8px; border: 1px solid var(--accent); background: #fff; color: var(--accent-dark); font-weight: 600; cursor: pointer; font-size: 0.9rem; }
-.seat-aisle { margin-left: 1.25rem; }
+.seat-aisle { grid-column: 4; }
 .seat-livre:hover { background: var(--accent-soft); }
 .seat-selecionado { background: var(--accent); color: #fff; border-color: var(--accent); }
 .seat-ocupado { background: #d7dde1; border-color: #d7dde1; color: #97a1a8; cursor: not-allowed; }
